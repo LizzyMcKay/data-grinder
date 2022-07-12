@@ -1,0 +1,4 @@
+#do not track the following files
+DIRs.txt
+combinations.txt
+fslog.txt
