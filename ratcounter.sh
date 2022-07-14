@@ -11,7 +11,7 @@ touch combinations.txt
 echo "" > combinations.txt
 
 # iterate over Rat 9 to Rat 99
-for k in {18..99}
+for k in {10..99}
 do
 	#delimiter for cosemtic purposes
 	printf "\n -------------------------------------------- \n"
@@ -48,7 +48,7 @@ do
 	# we will put the good files into a new array
 	declare -a newnames
 
-	for (( i=0;i<=${#names[@]};i++ ))
+	for (( i=0;i<${#names[@]};i++ ))
 	do
 		#^R to exclude filenames with MARIA in it
 		if [[ ! "${names[i]}" =~ .*[^M|I][AB].* ]]
@@ -64,120 +64,138 @@ do
 	
 	printf "\n ${#names[@]} filenames in total, out of which ${#newnames[@]} were part of the experiment, KEEPING ${#newnames[@]} IN LIST"
 	printf "\n"
+
+	# the rest of the code makes sense only if any filenames were part of the experiment > ${newnames[@]} is not empty
+	if (( ${#newnames[@]}>0 ))
+	then
 	
-	for i in ${!newnames[@]}
-	do
-		printf "\n filename ${newnames[i]} with index $i"
-	done
+		for i in ${!newnames[@]}
+		do
+			printf "\n filename ${newnames[i]} with index $i"
+		done
 
-	sleep 2
-	printf "\n"
-
-	### now find the filenames the first 5 digits of which occur mutliple times in names array ~ filenames which are redundant
-	#in other words, check if the date of the ith filename matches with date in ((i-1))th filename
-	#declare array to save to-be-deleted filename positions into
-	declare -a delete
-	#also the number of files with that specific date == number of recording session made on that day will be counted.
-	sessioncounter=0;
-	# print the firs element in newnames array before the loop begins for cosmetic purposes 
-	#printf "\n ${newnames[0]} \n"
-
-	for (( i=0;i<$(( ${#newnames[@]}-1 ));i++  ))
-	do
-		
-		printf "\n ${newnames[$i]} "
-
-		if [ "${newnames[i]:0:5}" == "${newnames[((i+1))]:0:5}" ]
-		then
-	
-			sessioncounter=$(( $sessioncounter+1 ))
-			printf "\n This file corresponds to the $sessioncounter th recording session on that day \n"
-
-			printf "Recorded on the same day as \n"
-			#if the substrings match, save the array position of the ith filename
-			delete=(${delete[@]} $(( $i+1 )))
-
-		else
-			printf "\n RECORDED ON A DIFFERENT DAY THAN \n"
-			# if there were less than 7 sessions that day, the full experiment could not have benn conducted since it has 7 sessions.
-			# such filename is irrelevant
-
-			#still sessioncounter needs to be incremented
-			sessioncounter=$(( sessionocunter+1 ))
-
-			if (( $sessioncounter <= 6 ))
-			then
-	 			printf "\n Only $(( $sessioncounter )) sessions recorded that day, that's not enough for full experiment \n"
-				
-				delete2=$(( $i-$sessioncounter ))
-				printf "\n deleting also file ${newnames[$delete2]} with index $delete2 from the list \n"
-				sleep 2
-			fi
-			#set sessioncounter back to 0
-			sessioncounter=0
-
-		fi
-		# print the last element of the array as the previous loop ended at ${#newnames[@]}-1
-		printf "\n ${newnames[$(( $i+1 ))]} \n"
-		
+		sleep 2
 		printf "\n"
 
-	done
+		### now find the filenames the first 5 digits of which occur mutliple times in names array ~ filenames which are redundant
+		#in other words, check if the date of the ith filename matches with date in ((i-1))th filename
+		#declare array to save to-be-deleted filename positions into
+		declare -a delete
+		#also the number of files with that specific date == number of recording session made on that day will be counted.
+		sessioncounter=0;
 
-	# check for cases when there are very few days in which a rat was recorded. I'm lazy af 
-		if (( ${#newnames[@]} <= 7 ))
+		for (( i=0;i<$(( ${#newnames[@]}-1 ));i++  ))
+		do
+			
+			printf "\n ${newnames[$i]} "
+
+			if [ "${newnames[i]:0:5}" == "${newnames[((i+1))]:0:5}" ]
 			then
-	 			printf "\n Only $(( $sessioncounter+1 )) sessions recorded that day, that's not enough for full experiment \n"
-				
-				delete2=$(( $i-$sessioncounter ))
-				printf "\n deleting also file ${newnames[$delete2]} with index $delete2 from the list \n"
+		
+				sessioncounter=$(( $sessioncounter+1 ))
+				printf "\n This file corresponds to the $sessioncounter th recording session on that day \n"
+
+				printf "Marking for deletion <<< recorded on the same day as \n"
+				#if the substrings match, save the array position of the ith filename
+				delete=(${delete[@]} $(( $i+1 )))
+
 			else
-				printf "\n statement not working \n"
+				printf "\n RECORDED ON A DIFFERENT DAY THAN \n"
+				# if there were less than 7 sessions that day, the full experiment could not have benn conducted since it has 7 sessions.
+				# such filename is irrelevant
+
+				#still sessioncounter needs to be incremented
+				sessioncounter=$(( $sessioncounter+1 ))
+
+				if (( $sessioncounter <= 6 ))
+				then
+					printf "\n Only $(( $sessioncounter )) sessions recorded that day, that's not enough for full experiment \n"
+					
+					delete2=(${delete2[@]} $(( $i-( $sessioncounter-1 ) )))
+					printf "\n marking also ${newnames[${delete2[-1]}]} with index ${delete2[-1]} for deletion \n"
+					sleep 2
+				fi
+				#set sessioncounter back to 0
+				sessioncounter=0
+
+			fi
+
+		done
+
+		# print the last element of the array as the previous loop ended at ${#newnames[@]}-1
+		printf "\n ${newnames[$(( $i ))]} \n"
+			
+		# take care of the last element of the array
+		if [[ "${newnames[i]:0:5}" == "${newnames[((i-1))]:0:5}" ]]
+		then
+			sessioncounter=$(( $sessioncounter+1 ))
+
+			printf "\n This file corresponds to the $sessioncounter th recording session on that day \n" 
+			delete=(${delete[@]} $(( $i+1 )))
+		else
+			# take care of the special case in which the last element is a new recording day
+			sessioncounter=1
 		fi
 
+		printf "\n"
 
-	sleep 2
-	
-	printf "\n indices of filenames to be deleted because redundant: "
-	echo "${delete[@]}" 
-	printf "\n indices of filenames to be deleted because nt enough sessions: "
-	echo "${delete2[@]}"
-	#delete the filenames which are redundant
-	for i in ${delete[@]}
-	do
-		unset newnames[$i]
-	done
-	
-	#delete aslo filenames which are not part of the full 7-session experiment
-	for i in ${delete2[@]}
-	do
-		unset newnames[$i]
-	done
+		# now check if the last array element makes a difference in session count.
+		# this also takes care of cases in which there vere <=6 recording days for the rat.
+		if (( $sessioncounter <= 6 ))
+			then
+				printf "\n Only $sessioncounter sessions recorded that day, that's not enough for full experiment \n"
+				
+				delete2=(${delete2[@]} $(( $i-( $sessioncounter-1 ) )))
+				printf "\n marking also file ${newnames[${delete2[-1]}]} with index ${delete2[-1]} for deletion \n"
+			fi
 
-	### trim filenames so that they are in <DATE>_<RatNumber> format
-	
-	len=$(echo ${#newnames[@]})
-	printf "\n I found this many combinations: $len"
-	printf "\n" 
-	# turn out you can easily iterate over array indices in bash. who could have known 
-	printf "filenames (and their indices) which are unique combinations:\n"
 
-	#declare -a trnames
-	for i in ${!newnames[@]}
-	do
-		echo $i
-		echo ${newnames[i]} | egrep -o '[0-9]+.*at[0-9]{2}'
-		newnames[$i]=$(echo ${newnames[$i]} | egrep -o '[0-9]+.*at[0-9]{2}')
-	done
+		sleep 2
+		
+		printf "\n indices of filenames to be deleted because redundant: "
+		echo "${delete[@]}" 
+		printf "\n indices of filenames to be deleted because nt enough sessions: "
+		echo "${delete2[@]}"
+		#delete the filenames which are redundant
+		for i in ${delete[@]}
+		do
+			unset newnames[$i]
+		done
+		
+		#delete aslo filenames which are not part of the full 7-session experiment
+		for i in ${delete2[@]}
+		do
+			unset newnames[$i]
+		done
 
-	# write the trimmed and selected filenames to a file
-	printf "\n * * * * writing into combinations.txt file * * * * \n"
-	for i in ${newnames[@]}
-	do
-		echo $i >> combinations.txt
-		printf "\n" >> combinations.txt
-	done
+		### trim filenames so that they are in <DATE>_<RatNumber> format
+		
+		len=$(echo ${#newnames[@]})
+		printf "\n I found this many combinations: $len"
+		printf "\n" 
+		# turn out you can easily iterate over array indices in bash. who could have known 
+		printf "filenames (and their indices) which are unique combinations:\n"
 
+		#declare -a trnames
+		for i in ${!newnames[@]}
+		do
+			echo $i
+			echo ${newnames[i]} | egrep -o '[0-9]+.*at[0-9]{2}'
+			newnames[$i]=$(echo ${newnames[$i]} | egrep -o '[0-9]+.*at[0-9]{2}')
+		done
+
+		# write the trimmed and selected filenames to a file
+		printf "\n * * * * writing into combinations.txt file * * * * \n"
+		for i in ${newnames[@]}
+		do
+			echo $i >> combinations.txt
+			printf "\n" >> combinations.txt
+		done
+
+	else
+		printf "\n No files were recorded as part of the experiment. Nothing to write \n"
+	fi
+		
 	#cleanup after each Rat number
 	unset names
 	unset newnames
